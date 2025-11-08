@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Products - Database Manager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">Database</div>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/users.html">Users</a></li>
+                <li><a href="/products.html" class="active">Products</a></li>
+                <li><a href="/login.html">Login</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="page-header">
+                <h1>📦 Products Database</h1>
+                <p id="product-count">Loading...</p>
+            </div>
+
+            <div id="loading" class="loading">Loading products...</div>
+            <div id="error" class="error" style="display: none;"></div>
+
+            <div id="products-container" class="table-container">
+                <table id="products-table">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Item Name</th>
+                            <th>Category</th>
+                            <th>Brand</th>
+                            <th>Price</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="products-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <div id="productModal" class="modal">
+        <div class="modal-content modal-large">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="productDetail"></div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Database Faiz</p>
+    </footer>
+
+    <script>
+        async function loadProducts() {
+            try {
+                const response = await fetch('/api/products');
+                const data = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.success) {
+                    document.getElementById('product-count').textContent = `Total Products: ${data.count}`;
+                    displayProducts(data.data);
+                } else {
+                    showError('Failed to load products');
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                showError('Error connecting to server: ' + error.message);
+            }
+        }
+
+        function displayProducts(products) {
+            const tbody = document.getElementById('products-tbody');
+            
+            if (products.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="no-data">No products found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = products.map(product => `
+                <tr>
+                    <td>${product.sku || 'N/A'}</td>
+                    <td>${product.item_name || product.name || 'N/A'}</td>
+                    <td>${product.category || 'N/A'}</td>
+                    <td>${product.brand || 'N/A'}</td>
+                    <td>${product.price ? 'Rp ' + formatPrice(product.price) : 'N/A'}</td>
+                    <td>
+                        <button class="btn-small" onclick="viewProduct('${product.id}')">View</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function formatPrice(price) {
+            return new Intl.NumberFormat('id-ID').format(price);
+        }
+
+        async function viewProduct(id) {
+            try {
+                const response = await fetch(`/api/products/${id}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    showProductDetail(data.data);
+                } else {
+                    alert('Failed to load product details');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function showProductDetail(product) {
+            const modal = document.getElementById('productModal');
+            const detailDiv = document.getElementById('productDetail');
+            
+            // Handle media (JSONB array of images)
+            let mediaHtml = '';
+            if (product.media) {
+                try {
+                    // Parse media if it's a string
+                    const media = typeof product.media === 'string' ? JSON.parse(product.media) : product.media;
+                    
+                    console.log('Media data:', media);
+                    
+                    if (media.images && Array.isArray(media.images)) {
+                        // Format: {"images": [{url: "...", type: "image"}]}
+                        mediaHtml = media.images
+                            .filter(img => img.type === 'image')
+                            .map(img => `
+                                <div class="product-media-item">
+                                    <img src="${img.url}" alt="Product Image" onerror="this.src='https://via.placeholder.com/300x300/667eea/ffffff?text=No+Image'">
+                                </div>
+                            `).join('');
+                    } else if (Array.isArray(media)) {
+                        // Format: [{url: "...", type: "image"}]
+                        mediaHtml = media
+                            .filter(img => img.type === 'image')
+                            .map(img => `
+                                <div class="product-media-item">
+                                    <img src="${img.url}" alt="Product Image" onerror="this.src='https://via.placeholder.com/300x300/667eea/ffffff?text=No+Image'">
+                                </div>
+                            `).join('');
+                    }
+                    
+                    // If no images found
+                    if (!mediaHtml) {
+                        mediaHtml = `
+                            <div class="product-media-item">
+                                <img src="https://via.placeholder.com/300x300/667eea/ffffff?text=No+Image" alt="No Image">
+                            </div>
+                        `;
+                    }
+                } catch (e) {
+                    console.error('Error parsing media:', e);
+                    mediaHtml = `
+                        <div class="product-media-item">
+                            <img src="https://via.placeholder.com/300x300/667eea/ffffff?text=Error+Loading+Image" alt="Error">
+                        </div>
+                    `;
+                }
+            } else {
+                mediaHtml = `
+                    <div class="product-media-item">
+                        <img src="https://via.placeholder.com/300x300/667eea/ffffff?text=No+Image" alt="No Image">
+                    </div>
+                `;
+            }
+            
+            const sku = product.sku || 'N/A';
+            const itemName = product.item_name || product.name || 'N/A';
+            const category = product.category || 'N/A';
+            const brand = product.brand || 'N/A';
+            const description = product.description || 'No description available';
+            const price = product.price ? 'Rp ' + formatPrice(product.price) : 'N/A';
+            
+            detailDiv.innerHTML = `
+                <div class="detail-card product-detail">
+                    <h2>📦 Product Details</h2>
+                    
+                    <div class="product-media-container">
+                        ${mediaHtml}
+                    </div>
+                    
+                    <div class="detail-info">
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">ID:</span>
+                                <span class="info-value">${product.id}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">SKU:</span>
+                                <span class="info-value">${sku}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Item Name:</span>
+                                <span class="info-value">${itemName}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Category:</span>
+                                <span class="info-value">${category}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Brand:</span>
+                                <span class="info-value">${brand}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Price:</span>
+                                <span class="info-value price-highlight">${price}</span>
+                            </div>
+                            <div class="info-item full-width">
+                                <span class="info-label">Description:</span>
+                                <span class="info-value">${description}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('productModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('productModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Load products when page loads
+        loadProducts();
+    </script>
+</body>
+</html>

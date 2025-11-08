@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users - Database Manager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">Database</div>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/users.html" class="active">Users</a></li>
+                <li><a href="/products.html">Products</a></li>
+                <li><a href="/login.html">Login</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="page-header">
+                <h1>👥 Users Database</h1>
+                <p id="user-count">Loading...</p>
+            </div>
+
+            <div id="loading" class="loading">Loading users...</div>
+            <div id="error" class="error" style="display: none;"></div>
+
+            <div id="users-container" class="table-container">
+                <table id="users-table">
+                    <thead>
+                        <tr>
+                            <th>Full Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="userDetail"></div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Database Faiz</p>
+    </footer>
+
+    <script>
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/users');
+                const data = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.success) {
+                    document.getElementById('user-count').textContent = `Total Users: ${data.count}`;
+                    displayUsers(data.data);
+                } else {
+                    showError('Failed to load users');
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                showError('Error connecting to server: ' + error.message);
+            }
+        }
+
+        function displayUsers(users) {
+            const tbody = document.getElementById('users-tbody');
+            
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="no-data">No users found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = users.map(user => `
+                <tr>
+                    <td>${user.full_name || user.name || 'N/A'}</td>
+                    <td>${user.email || 'N/A'}</td>
+                    <td>${user.phone || 'N/A'}</td>
+                    <td>
+                        <button class="btn-small" onclick='viewUser("${user.id}")'>View</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function viewUser(id) {
+            try {
+                console.log('Fetching user with ID:', id);
+                const response = await fetch(`/api/users/${id}`);
+                const data = await response.json();
+                
+                console.log('User data received:', data);
+                
+                if (data.success) {
+                    showUserDetail(data.data);
+                } else {
+                    console.error('Failed to load user:', data);
+                    alert('Failed to load user details: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error fetching user:', error);
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function showUserDetail(user) {
+            console.log('Showing user detail:', user);
+            
+            const modal = document.getElementById('userModal');
+            const detailDiv = document.getElementById('userDetail');
+            
+            if (!modal || !detailDiv) {
+                console.error('Modal elements not found');
+                return;
+            }
+            
+            const imageUrl = user.image || 'https://via.placeholder.com/200x200/667eea/ffffff?text=No+Image';
+            const fullName = user.full_name || user.name || 'N/A';
+            const nickName = user.nick_name || 'N/A';
+            const email = user.email || 'N/A';
+            const phone = user.phone || 'N/A';
+            const address = user.address || 'N/A';
+            const birthday = user.birthday ? new Date(user.birthday).toLocaleDateString('id-ID', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            }) : 'N/A';
+            
+            detailDiv.innerHTML = `
+                <div class="detail-card">
+                    <div class="detail-image">
+                        <img src="${imageUrl}" alt="${fullName}" onerror="this.src='https://via.placeholder.com/200x200/667eea/ffffff?text=No+Image'">
+                    </div>
+                    <div class="detail-info">
+                        <h2>👤 User Details</h2>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">ID:</span>
+                                <span class="info-value">${user.id}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Full Name:</span>
+                                <span class="info-value">${fullName}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Nickname:</span>
+                                <span class="info-value">${nickName}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Email:</span>
+                                <span class="info-value">${email}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Phone:</span>
+                                <span class="info-value">${phone}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Birthday:</span>
+                                <span class="info-value">${birthday}</span>
+                            </div>
+                            <div class="info-item full-width">
+                                <span class="info-label">Address:</span>
+                                <span class="info-value">${address}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            console.log('Modal display set to block');
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('userModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('userModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        loadUsers();
+    </script>
+</body>
+</html>
